@@ -27,10 +27,9 @@ def analyze():
     try:
         img = Image.open(file.stream)
         
-        # Use the fast Flash model
-        model = genai.GenerativeModel('models/gemini-flash-latest')
+        # Use the latest Flash model
+        model = genai.GenerativeModel('models/gemini-1.5-flash')
 
-        # Optimized Prompt for Speed
         prompt = """
         Analyze this image's mood/color. Return valid JSON only.
         {
@@ -46,23 +45,27 @@ def analyze():
         }
         """
 
-        # SECURITY SYSTEM: Strict blocking for harmful content
+        # === FIX: RELAXED SAFETY SETTINGS ===
+        # We allow "Medium" and "Low" probability content, blocking only "High" probability threats.
+        # This fixes the issue where cars/skin/beaches were getting blocked.
         safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
         }
 
         try:
             response = model.generate_content([prompt, img], safety_settings=safety_settings)
-        except Exception:
-            # If the API refuses to generate, it's usually a safety block
-            return jsonify({'error': "SECURITY ALERT: This image violates safety guidelines (Violence/Nudity/Hate). Request blocked."}), 400
+        except Exception as e:
+            print(f"Generation Error: {e}")
+            return jsonify({'error': "AI Service Busy. Please try again."}), 500
 
-        # Check if response was blocked by safety filters
+        # Check if response was blocked
         if not response.parts:
-             return jsonify({'error': "SECURITY ALERT: The AI flagged this image as unsafe."}), 400
+             # Debugging: Print exactly why it was blocked in the terminal
+             print(f"Blocked Reason: {response.prompt_feedback}")
+             return jsonify({'error': "The AI refused this image. Try a clearer photo."}), 400
 
         # Clean JSON
         clean_text = response.text.replace("```json", "").replace("```", "").strip()
@@ -71,8 +74,8 @@ def analyze():
         return jsonify(data)
 
     except Exception as e:
-        print(f"Error: {e}")
-        return jsonify({'error': "Could not read the vibe. Try a different photo."}), 500
+        print(f"Server Error: {e}")
+        return jsonify({'error': "Could not process image."}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=3000)
