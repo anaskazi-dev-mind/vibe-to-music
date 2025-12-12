@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibeify | AI Music Curator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            background-color: #0f172a;
+            color: white; 
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* --- TRENDING COLORFUL BACKGROUND --- */
+        .aurora-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            background: linear-gradient(
+                -45deg, 
+                #0a0a0a, 
+                #3b0764, 
+                #1db954, 
+                #1e40af
+            );
+            background-size: 400% 400%;
+            animation: auroraMove 20s ease infinite;
+        }
+
+        @keyframes auroraMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass-panel {
+            background: rgba(20, 20, 20, 0.75);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 32px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        }
+
+        /* Song Row Styling */
+        .song-row {
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .song-row:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(100, 255, 100, 0.2);
+            transform: scale(1.01) translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        /* Loader Animation */
+        .bar {
+            width: 6px; height: 20px;
+            background: #1db954;
+            border-radius: 3px;
+            animation: equalize 1s infinite;
+        }
+        .bar:nth-child(2) { animation-delay: 0.2s; }
+        .bar:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes equalize {
+            0%, 100% { height: 20px; }
+            50% { height: 40px; }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-6">
+
+    <div class="aurora-bg"></div>
+
+    <main class="w-full max-w-md relative z-10">
+        
+        <header class="flex items-center justify-between mb-6 px-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/10 p-2 rounded-full backdrop-blur-md">
+                     <i class="fa-brands fa-spotify text-3xl text-green-400"></i>
+                </div>
+                <h1 class="text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-green-200">Vibeify</h1>
+            </div>
+        </header>
+
+        <div id="upload-zone" class="glass-panel p-2 transition-all duration-500 hover:shadow-green-900/20">
+            
+            <div id="drop-area" class="relative w-full h-96 bg-zinc-900/30 rounded-[28px] border-2 border-dashed border-zinc-700/50 hover:border-green-400/70 hover:bg-zinc-800/50 transition-all cursor-pointer flex flex-col items-center justify-center group backdrop-blur-sm">
+                <input type="file" id="file-input" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer">
+                
+                <div class="w-20 h-20 bg-gradient-to-tr from-green-600 to-emerald-400 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition shadow-lg shadow-green-900/30 animate-pulse">
+                    <i class="fa-solid fa-camera text-3xl text-white"></i>
+                </div>
+                <p class="text-lg font-bold text-white mb-2">Drop image here</p>
+                <p class="text-sm text-green-200/70 bg-green-900/20 px-4 py-2 rounded-full">We'll find the music match</p>
+            </div>
+
+            <div id="preview-wrapper" class="hidden relative w-full h-96 group">
+                <img id="image-preview" class="w-full h-full object-cover rounded-[28px] transition-transform duration-700 group-hover:scale-105">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent rounded-[28px]"></div>
+                
+                <div class="absolute bottom-8 left-8 right-8">
+                    <span class="inline-block bg-green-500 text-black text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md mb-3 shadow-lg">Vibe Detected</span>
+                    <h2 id="vibe-title-overlay" class="text-4xl font-black text-white leading-none mb-2 drop-shadow-lg"></h2>
+                    <p id="vibe-desc-overlay" class="text-sm text-gray-200 font-medium line-clamp-2 drop-shadow-md opacity-90"></p>
+                </div>
+            </div>
+        </div>
+
+        <button id="generate-btn" class="hidden w-full mt-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 text-white font-extrabold py-5 rounded-3xl text-xl shadow-xl shadow-green-900/50 transition-all transform active:scale-95 flex items-center justify-center tracking-wide">
+             CURATE PLAYLIST <i class="fa-solid fa-arrow-right ml-3 animate-bounce-x"></i>
+        </button>
+
+        <div id="loading" class="hidden mt-16 text-center">
+            <div class="flex justify-center items-end gap-2 h-16 mb-6">
+                <div class="bar"></div><div class="bar"></div><div class="bar"></div>
+            </div>
+            <p id="loading-text" class="text-green-300 font-bold text-sm uppercase tracking-[0.2em] animate-pulse">Initializing AI...</p>
+        </div>
+
+        <div id="playlist-area" class="hidden mt-10">
+            <div class="flex items-center justify-between mb-6 px-2">
+                <div>
+                     <h3 class="text-white text-lg font-black uppercase tracking-wide">Your Mix</h3>
+                     <p class="text-gray-400 text-xs">Based on visual analysis</p>
+                </div>
+                <span class="bg-green-500/10 text-green-400 text-xs font-bold px-3 py-1 rounded-full border border-green-500/20"><i class="fa-brands fa-spotify mr-2"></i>Ready to Play</span>
+            </div>
+
+            <div id="songs-container" class="space-y-3">
+                </div>
+
+            <button onclick="location.reload()" class="w-full mt-8 py-4 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-2xl text-sm font-bold transition flex items-center justify-center uppercase tracking-wider">
+                <i class="fa-solid fa-rotate-left mr-2"></i> Create New Vibe
+            </button>
+        </div>
+
+        <footer class="mt-16 mb-6 text-center">
+            <div class="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-black/30 backdrop-blur-md border border-white/10 shadow-2xl hover:scale-105 transition-transform duration-300 cursor-default">
+                <span class="text-gray-300 text-sm font-medium tracking-wide">Created by</span>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-green-300 to-white text-sm font-extrabold tracking-wider">Anas Kazi</span>
+                <i class="fa-solid fa-heart text-red-500 animate-pulse text-xs ml-1"></i>
+                <span class="text-gray-500 text-xs mx-1">|</span>
+                <i class="fa-solid fa-mug-hot text-yellow-400 text-xs"></i>
+            </div>
+        </footer>
+        </main>
+
+    <script>
+        const fileInput = document.getElementById('file-input');
+        const dropArea = document.getElementById('drop-area');
+        const previewWrapper = document.getElementById('preview-wrapper');
+        const imagePreview = document.getElementById('image-preview');
+        const generateBtn = document.getElementById('generate-btn');
+        const loading = document.getElementById('loading');
+        const loadingText = document.getElementById('loading-text');
+        const playlistArea = document.getElementById('playlist-area');
+        const songsContainer = document.getElementById('songs-container');
+        const vibeTitleOverlay = document.getElementById('vibe-title-overlay');
+        const vibeDescOverlay = document.getElementById('vibe-desc-overlay');
+
+        const messages = ["Extracting color palette...", "Analyzing visual mood...", "Accessing sonic database...", "Mixing your playlist..."];
+
+        let selectedFile = null;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                selectedFile = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imagePreview.src = e.target.result;
+                    previewWrapper.classList.remove('hidden');
+                    dropArea.classList.add('hidden');
+                    generateBtn.classList.remove('hidden');
+                    generateBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                reader.readAsDataURL(selectedFile);
+            }
+        });
+
+        generateBtn.addEventListener('click', async () => {
+            generateBtn.classList.add('hidden');
+            loading.classList.remove('hidden');
+            loading.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            let msgIdx = 0;
+            loadingText.innerText = messages[0];
+            const interval = setInterval(() => {
+                msgIdx = (msgIdx + 1) % messages.length;
+                loadingText.innerText = messages[msgIdx];
+            }, 1800);
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+
+            try {
+                const response = await fetch('/analyze', { method: 'POST', body: formData });
+                const data = await response.json();
+
+                clearInterval(interval);
+                loading.classList.add('hidden');
+
+                if (data.error) {
+                    alert(data.error);
+                    location.reload();
+                    return;
+                }
+
+                vibeTitleOverlay.innerText = data.vibe_title;
+                vibeDescOverlay.innerText = data.vibe_description;
+
+                songsContainer.innerHTML = '';
+                data.playlist.forEach((song, index) => {
+                    const query = encodeURIComponent(`${song.title} ${song.artist}`);
+                    const spotifyUrl = `https://open.spotify.com/search/${query}`;
+
+                    const row = document.createElement('a');
+                    row.href = spotifyUrl;
+                    row.target = "_blank";
+                    row.className = "song-row flex items-center justify-between p-4 rounded-2xl cursor-pointer group";
+                    
+                    row.innerHTML = `
+                        <div class="flex items-center gap-5">
+                             <span class="text-green-500/50 font-bold text-lg group-hover:text-green-400 transition">${index + 1}</span>
+                            <div class="w-12 h-12 bg-zinc-800/80 rounded-xl flex items-center justify-center group-hover:bg-green-500/20 group-hover:scale-110 transition shadow-md">
+                                <i class="fa-solid fa-music text-gray-400 group-hover:text-green-400 transition"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-base text-white leading-tight group-hover:text-green-300 transition">${song.title}</h4>
+                                <p class="text-xs text-gray-400 font-medium uppercase tracking-wider mt-1">${song.artist}</p>
+                            </div>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center group-hover:bg-green-500 group-hover:text-black transition scale-90 group-hover:scale-100 shadow-lg">
+                             <i class="fa-solid fa-play text-white ml-1 group-hover:text-black transition"></i>
+                        </div>
+                    `;
+                    songsContainer.appendChild(row);
+                });
+
+                playlistArea.classList.remove('hidden');
+                playlistArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            } catch (error) {
+                clearInterval(interval);
+                alert("Something went wrong. Please try again.");
+                location.reload();
+            }
+        });
+    </script>
+    <style>
+        @keyframes bounce-x { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+        .animate-bounce-x { animation: bounce-x 1s infinite; }
+    </style>
+</body>
+</html>
